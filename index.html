@@ -1,49 +1,188 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FRC AI Mentor</title>
     <style>
-        body { font-family: sans-serif; background: #121212; color: white; padding: 40px; display: flex; flex-direction: column; align-items: center; }
-        #chatbox { width: 100%; max-width: 700px; height: 500px; background: #1e1e1e; border-radius: 10px; padding: 20px; overflow-y: auto; border: 1px solid #333; margin-bottom: 20px; }
-        .input-area { display: flex; width: 100%; max-width: 700px; gap: 10px; }
-        input { flex: 1; padding: 15px; border-radius: 5px; border: none; background: #333; color: white; }
-        button { padding: 15px 25px; border-radius: 5px; border: none; background: #007bff; color: white; cursor: pointer; font-weight: bold; }
-        .msg { margin-bottom: 15px; padding: 10px; border-radius: 5px; }
-        .user { background: #2c3e50; border-left: 4px solid #3498db; }
-        .ai { background: #27ae6033; border-left: 4px solid #2ecc71; white-space: pre-wrap; }
+        :root {
+            --bg-color: #212121;
+            --sidebar-color: #171717;
+            --user-msg-bg: #2f2f2f;
+            --ai-msg-bg: transparent;
+            --text-color: #ececec;
+            --accent-blue: #3b82f6;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Sentry', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-color); color: var(--text-color);
+            display: flex;
+        }
+
+        /* Sidebar */
+        #sidebar {
+            width: 260px; background: var(--sidebar-color);
+            display: flex; flex-direction: column; padding: 15px;
+            border-right: 1px solid #333;
+        }
+
+        #sidebar h2 { font-size: 1.2rem; margin-bottom: 20px; color: white; display: flex; align-items: center; gap: 10px; }
+
+        .new-chat-btn {
+            background: transparent; border: 1px solid #4d4d4d; color: white;
+            padding: 10px; border-radius: 5px; cursor: pointer; text-align: left;
+            transition: background 0.2s;
+        }
+        .new-chat-btn:hover { background: #2d2d2d; }
+
+        /* Main Chat Area */
+        #main-content {
+            flex: 1; display: flex; flex-direction: column;
+            height: 100%; position: relative;
+        }
+
+        #chatbox {
+            flex: 1; overflow-y: auto; padding-bottom: 150px;
+            scroll-behavior: smooth;
+        }
+
+        /* Message Bubbles */
+        .msg-container {
+            width: 100%; padding: 25px 0;
+            display: flex; justify-content: center;
+        }
+        .user-container { background: var(--user-msg-bg); }
+
+        .msg-content {
+            max-width: 800px; width: 90%;
+            display: flex; gap: 20px; line-height: 1.6;
+        }
+
+        .avatar {
+            width: 30px; height: 30px; border-radius: 2px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 12px; flex-shrink: 0;
+        }
+        .user-avatar { background: #5436da; }
+        .ai-avatar { background: #10a37f; }
+
+        .text { white-space: pre-wrap; font-size: 16px; }
+
+        /* Input Area */
+        .input-wrapper {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            background: linear-gradient(transparent, var(--bg-color) 20%);
+            padding: 30px 0; display: flex; justify-content: center;
+        }
+
+        .input-container {
+            max-width: 800px; width: 90%; position: relative;
+            background: #2f2f2f; border: 1px solid #4d4d4d;
+            border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        textarea {
+            width: 100%; background: transparent; border: none;
+            color: white; padding: 15px 50px 15px 15px;
+            resize: none; font-size: 16px; outline: none;
+            box-sizing: border-box; max-height: 200px;
+        }
+
+        #sendBtn {
+            position: absolute; right: 10px; bottom: 10px;
+            background: var(--accent-blue); border: none;
+            color: white; border-radius: 5px; padding: 5px 10px;
+            cursor: pointer; opacity: 0.5; transition: opacity 0.2s;
+        }
+        #sendBtn.active { opacity: 1; }
+
     </style>
 </head>
 <body>
-    <h1>🤖 FRC Programming Assistant</h1>
-    <div id="chatbox"></div>
-    <div class="input-area">
-        <input type="text" id="userInput" placeholder="Ask to fix code or generate a new subsystem...">
-        <button onclick="askAI()">Send</button>
+
+    <div id="sidebar">
+        <h2>🤖 5409 AI</h2>
+        <button class="new-chat-btn" onclick="location.reload()">+ New Chat</button>
+    </div>
+
+    <div id="main-content">
+        <div id="chatbox">
+            <div class="msg-container">
+                <div class="msg-content">
+                    <div class="avatar ai-avatar">AI</div>
+                    <div class="text">Hello! I'm your FRC Mentor. Ask me about your robot's Java code or WPILib!</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-wrapper">
+            <div class="input-container">
+                <textarea id="userInput" rows="1" placeholder="Message FRC AI..." oninput="autoGrow(this)"></textarea>
+                <button id="sendBtn" onclick="askAI()">Send</button>
+            </div>
+        </div>
     </div>
 
     <script>
+        const input = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const chat = document.getElementById('chatbox');
+
+        // Allow Enter to send, Shift+Enter for new line
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                askAI();
+            }
+        });
+
+        function autoGrow(element) {
+            element.style.height = "5px";
+            element.style.height = (element.scrollHeight) + "px";
+            sendBtn.classList.toggle('active', element.value.length > 0);
+        }
+
         async function askAI() {
-            const input = document.getElementById('userInput');
-            const chat = document.getElementById('chatbox');
-            const question = input.value;
+            const question = input.value.trim();
             if(!question) return;
 
-            chat.innerHTML += `<div class="msg user"><b>Student:</b><br>${question}</div>`;
+            // Add User Message
+            chat.innerHTML += `
+                <div class="msg-container user-container">
+                    <div class="msg-content">
+                        <div class="avatar user-avatar">U</div>
+                        <div class="text">${question}</div>
+                    </div>
+                </div>`;
+            
             input.value = "";
+            input.style.height = "auto";
+            chat.scrollTop = chat.scrollHeight;
 
             try {
                 const response = await fetch('https://frcai.onrender.com/ask', {
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'x-team-key': '5409'
                     },
                     body: JSON.stringify({ question: question })
                 });
 
                 const data = await response.json();
-                chat.innerHTML += `<div class="msg ai"><b>Mentor:</b><br>${data.answer}</div>`;
+                
+                // Add AI Message
+                chat.innerHTML += `
+                    <div class="msg-container">
+                        <div class="msg-content">
+                            <div class="avatar ai-avatar">AI</div>
+                            <div class="text">${data.answer || data.detail}</div>
+                        </div>
+                    </div>`;
             } catch (err) {
-                chat.innerHTML += `<div class="msg ai" style="color:red">Server Error. Make sure Render is awake!</div>`;
+                chat.innerHTML += `<div class="msg-container"><div class="msg-content" style="color:red">Server Error. Make sure Render is awake!</div></div>`;
             }
             chat.scrollTop = chat.scrollHeight;
         }
